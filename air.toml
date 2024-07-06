@@ -1,0 +1,7 @@
+# air.toml
+
+root = "."  # Set the root directory of your project
+build = "go build -o ./tmp/main ."
+cmd = "./tmp/main"
+include = ["*.go", "*.html", "*.css", "*.js", "static/**/*"]  # List files to watch
+
