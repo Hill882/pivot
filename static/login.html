@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/styles.css" type="text/css">
+    <title>Login</title>
+</head>
+<body>
+    <div id="background">
+        <div id="container">
+            <h2 id="title">Login</h2>
+            <form id="login-form" action="http://localhost:8080/login" method="POST">
+                <div class="inputContainer">
+                    <label for="email" class="label">Email</label>
+                    <input type="email" id="email" class="input" name="email"required />
+                </div>
+                <div class="inputContainer">
+                    <label for="password" class="label">Password</label>
+                    <input type="password" id="password" class="input" name="password" required />
+                </div>
+                <div id="error" class="error"></div>
+                <button type="submit" id="login-button">Login</button>
+            </form>
+            {{ if .Error }}
+            <p style="color: red;">{{.Error}}</p>
+            {{ end }}
+            <p class="text-sm text-white text-center">
+                I forgot my <a href="/resetPassword">password</a>
+            </p>
+            <p class="text-sm text-white text-center">
+                No account yet? <a href="/contact">Sign up</a>
+            </p>
+            <p class="text-sm text-white text-center">Terms of Service and Privacy</p>
+        </div>
+    </div>
+</body>
+</html>
+

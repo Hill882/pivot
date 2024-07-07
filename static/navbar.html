@@ -1,0 +1,116 @@
+<!-- NAVBAR -->
+<style>
+
+  #settings-modal a li {
+    text-decoration: none;
+    color: black;
+  }
+
+  #settings-modal li {
+    padding: 10px 40px;
+    list-style-type: none;
+  }
+
+  #settings-modal li:hover {
+    background-color: #007299;
+    border-radius: 5px;
+  }
+
+  #settings-modal {
+    display: none;
+    min-width: fit-content;
+    position: absolute;
+    height: fit-content;
+    padding: 0;
+    border-radius: 5px;
+    right: 0;
+    top: 60px;
+    z-index: 3000;
+    background-color: white;
+  }
+</style>
+
+<div id="nav-bar">
+  <div id="left-container">
+    <img src="/static/images/logo.webp" id="logo"  alt="logo"/>
+    <span id="logo-name">Pivot</span>
+
+    <div class="search-container" id="job-search-container">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input class="search" id="job-search-input" placeholder="Search Jobs" autocomplete="off" />
+      <i id="joblist-dropdown" class="fa-solid fa-caret-down"></i>
+    </div>
+
+    <button id="create-job-button" type="button" class="btn btn-primary">create job</button>
+  </div>
+  <div id="middle-container">
+    <div class="search-container">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input class="search" id="google-maps-search" placeholder="Search location..." />
+    </div>
+  </div>
+  <div id="right-container">
+    <div class="avatar">
+      <span class="avatar-letter">JA</span>
+    </div>
+  </div>
+</div>
+
+<!-- END OF NAVBAR -->
+
+<!-- NEW JOB MODAL -->
+<div id="jobModal" class="modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">New Job</h5>
+        <button type="button" class="btn-close" aria-label="Close" id="close-modal"></button>
+      </div>
+      <div class="modal-body">
+        <form action="http://localhost:8080/createJob" method="POST" id="create-job-form" >
+          <div class="mb-3">
+            <label for="job-name" class="form-label">Job Name:</label>
+            <input type="text" class="form-control" id="job-name" name="job-name" placeholder="Enter Job Name" required>
+          </div>
+          <div class="mb-3">
+            <label for="company-name" class="form-label">Company Name:</label>
+            <input type="text" class="form-control" id="company-name" name="company-name" placeholder="Enter Company Name" required>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="cancel-modal-button">Close</button>
+            <button type="submit" class="btn btn-primary">Create Job</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- END OF JOB MODAL -->
+
+
+<!-- JOBLIST DROPDOWN MENU -->
+
+<ul id="dropdown-menu" class="hidden"></ul>
+
+<!-- END OF JOBLIST DROPDOWN MENU -->
+
+
+<!-- SETTINGS -->
+<ul id="settings-modal">
+  <a href="http://localhost:8080/logout" id="logout"><li>logout</li></a>
+</ul>
+
+<script>
+  $(document).ready(function() {
+    $(".avatar").on("click", function() {
+      let settingsModal = $("#settings-modal");
+      if (settingsModal.css("display") === "none") {
+          settingsModal.css("display", "block");
+      } else {
+          settingsModal.css("display", "none");
+      }
+    })
+  })
+</script>
+<!-- END OF SETTINGS -->
