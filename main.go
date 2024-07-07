@@ -1,7 +1,7 @@
 package main
 
 import (
-    "flag"
+    //"flag"
     "log"
     "html/template"
     "path/filepath"
@@ -13,6 +13,7 @@ import (
     "database/sql"
     "golang.org/x/crypto/bcrypt"
     "github.com/gorilla/sessions"
+    "github.com/gorilla/mux"
 )
 
 var db *sql.DB
@@ -20,8 +21,9 @@ var templates *template.Template
 var store *sessions.CookieStore
 
 func main() {
-    listenAddr := flag.String("listenaddr", ":8080", "Address to listen on")
-    flag.Parse()
+  r := mux.NewRouter()
+    //listenAddr := flag.String("listenaddr", ":8080", "Address to listen on")
+    //flag.Parse()
 
     err := godotenv.Load()
     if err != nil {
@@ -45,18 +47,18 @@ func main() {
         "apiKey": func() string { return apiKey },
     }).ParseGlob(filepath.Join("static", "*.html")))
 
-    fs := http.FileServer(http.Dir("./static"))
-    http.Handle("/static/", http.StripPrefix("/static/", fs))
+    r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
     // unprotected routes
-    http.HandleFunc("/login", handleLogin)
-    http.HandleFunc("/logout", handleLogout)
-    http.HandleFunc("/contact", handleGetContactPage)
+    r.HandleFunc("/login", handleLogin).Methods("GET", "POST")
+    r.HandleFunc("/logout", handleLogout).Methods("GET")
+    r.HandleFunc("/contact", handleGetContactPage).Methods("GET")
 	
     // protected routes
     // GET
-    http.Handle("/map", authenticationMiddleware(store, http.HandlerFunc(handleGetHomePage)))
-    http.Handle("/createJob", authenticationMiddleware(store, http.HandlerFunc(handleCreateJob)))
+    r.Handle("/map", authenticationMiddleware(store, http.HandlerFunc(handleGetMap))).Methods("GET")
+    r.Handle("/map/{id}", authenticationMiddleware(store, http.HandlerFunc(handleGetMapWithJob))).Methods("GET")
+    r.Handle("/createJob", authenticationMiddleware(store, http.HandlerFunc(handleCreateJob))).Methods("POST")
 
     // Database connection
     dbUser := os.Getenv("DB_USER")
@@ -75,9 +77,11 @@ func main() {
     if err != nil {
       log.Fatal("Cannot connect to the database:", err)
     }
+    log.Println("Server started at http://localhost:8080/map")
+    log.Fatal(http.ListenAndServe(":8080", r))
 
-    fmt.Printf("Starting server on http://localhost%s/login\n", *listenAddr)
-    log.Fatal(http.ListenAndServe(*listenAddr, nil))
+    //fmt.Printf("Starting server on http://localhost%s/login\n", *listenAddr)
+    //log.Fatal(http.ListenAndServe(*listenAddr, nil))
 }
 
 func authenticationMiddleware(store *sessions.CookieStore, next http.Handler) http.Handler {
@@ -102,7 +106,15 @@ func authenticationMiddleware(store *sessions.CookieStore, next http.Handler) ht
   })
 }
 
-func handleGetHomePage(w http.ResponseWriter, r *http.Request) {
+func handleGetMapWithJob(w http.ResponseWriter, r *http.Request) {
+	err := templates.ExecuteTemplate(w, "index.html", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func handleGetMap(w http.ResponseWriter, r *http.Request) {
 	err := templates.ExecuteTemplate(w, "index.html", nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -246,11 +258,54 @@ func handleCreateJob(w http.ResponseWriter, r *http.Request) {
 	jobName := r.FormValue("job-name")
 	companyName := r.FormValue("company-name")
 
+  err := createJobsTable()
+  if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+    return
+  }
 
-	fmt.Println(jobName)
-	fmt.Println(companyName)
+  id, err := insertJobIntoDb(jobName, companyName)
+  if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+    return
+  }
 
-	http.Redirect(w, r, fmt.Sprintf("/map/"), http.StatusSeeOther)
+  fmt.Println(id)
+
+	http.Redirect(w, r, fmt.Sprintf("/map/%s", id), http.StatusSeeOther)
+}
+
+func insertJobIntoDb(jobName, companyName string) (string, error) {
+  query := `INSERT INTO jobs (id, job_name, company_name, created_at)
+            VALUES (gen_random_uuid(), $1, $2, CURRENT_TIMESTAMP)
+            RETURNING id
+           `
+  var id string
+  err := db.QueryRow(query, jobName, companyName).Scan(&id)
+	//err := db.Exec(query, jobName, companyName).Scan(&id)
+  if err != nil {
+    log.Printf("Error inserting job into database: %v", err)
+    return "", err
+  }
+
+  return id, nil
+}
+
+func createJobsTable() error {
+	query := `CREATE TABLE IF NOT EXISTS jobs(
+	            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	            job_name TEXT NOT NULL,
+	            company_name TEXT NOT NULL, 
+              created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	          );`
+
+	_, err := db.Exec(query)
+	if err != nil {
+		log.Printf("Error create jobs table in database: %v", err)
+    return err
+	} else {
+    return nil
+  }
 }
 
 func createUsersTable() error {
