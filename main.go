@@ -80,8 +80,8 @@ func main() {
   // GET
   r.Handle("/map", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleGetMap(templates)))).Methods("GET")
   r.Handle("/map/{id}", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleGetMapWithJob(templates)))).Methods("GET")
-  r.Handle("/createJob", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleCreateJob(store)))).Methods("POST")
-  r.Handle("/jobs", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleGetJobs(store, db)))).Methods("GET")
+  r.Handle("/createJob", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleCreateJob(store, db)))).Methods("POST")
+  r.Handle("/jobs", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleGetJobs(store, db, templates)))).Methods("GET")
 
 
   log.Println("Server started at http://localhost:8080/map")
@@ -101,14 +101,9 @@ func authenticationMiddleware(store *sessions.CookieStore, next http.Handler) ht
       return
     }
 
-    if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
+    auth, ok := session.Values["authenticated"].(bool);
+    if !ok || !auth {
       http.Redirect(w, r, "/login", http.StatusSeeOther)
-      return
-    }
-
-    if ok := session.Values["admin_id"].(string);
-    if !ok {
-      http.Error(w, r, "/login", http.StatusSeeOther)
       return
     }
 

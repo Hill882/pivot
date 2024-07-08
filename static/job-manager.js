@@ -37,7 +37,8 @@ export class JobManager {
         throw new Error(`Http error! status: ${response.status}`);
       }
 
-      const jobs = response.json();
+      const jobs = await response.json();
+      console.log(jobs)
       if (jobs.length !== 0) {
         this.jobList = jobs;
         this.populateDropdown(this.jobList);
@@ -86,6 +87,7 @@ export class JobManager {
   }
 
   populateDropdown(items) {
+    console.log(items)
     const { jobListContainer } = this.$elements;
     jobListContainer.empty();
 

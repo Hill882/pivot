@@ -5,12 +5,11 @@ BEGIN
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
-        location TEST NOT NULL, 
-        company_name TEXT NOT NULL, 
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
 END $$;
 
+-- Create users table if not exists
 DO $$
 BEGIN
     CREATE TABLE IF NOT EXISTS public.users (
@@ -24,6 +23,7 @@ BEGIN
     );
 END $$;
 
+-- Create jobs table if not exists
 DO $$
 BEGIN
     CREATE TABLE IF NOT EXISTS public.jobs (
@@ -35,3 +35,4 @@ BEGIN
         FOREIGN KEY (admin_id) REFERENCES public.admins(id)
     );
 END $$;
+

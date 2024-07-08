@@ -1,6 +1,7 @@
 package handlers
 
 import (
+  "encoding/json"
 	"fmt"
 	"net/http"
 	"database/sql"
@@ -8,6 +9,7 @@ import (
   "time"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
+  _ "github.com/lib/pq"
 )
 
 type Job struct {
@@ -18,6 +20,17 @@ type Job struct {
 	CompanyID   string    `json:"company_id"`
 	CreatedAt   time.Time `json:"created_at"`
 }
+
+func hashPassword(password string) (string, error) {
+    bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    return string(bytes), err
+}
+
+func checkPasswordHash(password, hash string) bool {
+    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+    return err == nil
+}
+
 func HandleSignup(store *sessions.CookieStore, templates *template.Template, db *sql.DB) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
       if store == nil || templates == nil || db == nil {
@@ -37,12 +50,10 @@ func HandleSignup(store *sessions.CookieStore, templates *template.Template, db 
         http.Error(w, "Unable to parse form", http.StatusBadRequest)
         return
       }
-
+      
       email := r.FormValue("email")
       password := r.FormValue("password")
       confirmPassword := r.FormValue("confirm_password")
-      location := r.FormValue("location")
-      companyName := r.FormValue("company_name")
       
       if confirmPassword != password {
         renderSignupTemplateWithError(w, "Passwords do not match", templates)
@@ -50,17 +61,18 @@ func HandleSignup(store *sessions.CookieStore, templates *template.Template, db 
 
       hashedPassword, err := hashPassword(password)
       if err != nil {
-        renderSignupTemplateWithError(w, "Error creating account. Please try again", templates)
+        http.Error(w, "Unable to hash password", http.StatusInternalServerError)
         return
       }
 
-      query := `INSERT INTO admins (id, email, password, location, company_name, created_at)
-                VALUES (gen_random_uuid(), $1, $2, $3, $4, CURRENT_TIMESTAMP)
+      query := `INSERT INTO admins (id, email, password, created_at)
+                VALUES (gen_random_uuid(), $1, $2, CURRENT_TIMESTAMP)
                 RETURNING id
-                `
+               `
       var id string
-      err = db.QueryRow(query, email, hashedPassword, location, companyName).Scan(&id)
-      
+      err = db.QueryRow(query, email, hashedPassword).Scan(&id)
+
+
       if err != nil {
         renderSignupTemplateWithError(w, "Error creating account. Please try again", templates)
         return
@@ -73,12 +85,11 @@ func HandleSignup(store *sessions.CookieStore, templates *template.Template, db 
         return
       }
 
-      fmt.Println(id)
       //set session values
       session.Values["authenticated"] = true
       session.Values["user"] = email
-      session.Values["user_id"] = id //each user will belong to a admin id
-      session.Values["is_admin"] = true
+      session.Values["id"] = id 
+      session.Values["admin"] = true
 
       err = session.Save(r, w)
       if err != nil {
@@ -86,7 +97,7 @@ func HandleSignup(store *sessions.CookieStore, templates *template.Template, db 
         return
       }
 
-      http.Redirect(w, r, "/map/", http.StatusSeeOther)
+      http.Redirect(w, r, "/map", http.StatusSeeOther)
     }
   }
 }
@@ -127,18 +138,28 @@ func HandleLogin(store *sessions.CookieStore, templates *template.Template, db *
       email := r.FormValue("email")
       password := r.FormValue("password")
 
-      var id, admin_id, storedPassword string
+      var userId, storedPassword string
       var isAdmin bool
-      err = db.QueryRow("SELECT password FROM users WHERE email = $1", email).Scan(&userId, &storedPassword, &location, &companyName, &isAdmin)
-      if err != nil {
-        if err == sql.ErrNoRows {
-          renderLoginTemplateWithError(w, "Incorrect email or password", templates)
-        } else {
-          http.Error(w, "Database error", http.StatusInternalServerError)
-        }
+      // check if the user is a admin or not
+      err = db.QueryRow("SELECT id, password FROM users WHERE email = $1", email).Scan(&userId, &storedPassword)
+			if err != nil {
+				// If user not found in users table, check admins table
+				err = db.QueryRow("SELECT id, password FROM admins WHERE email = $1", email).Scan(&userId, &storedPassword)
+				if err != nil {
+					if err == sql.ErrNoRows {
+						renderLoginTemplateWithError(w, "Incorrect email or password", templates)
+					} else {
+						http.Error(w, "Database error", http.StatusInternalServerError)
+					}
+					return
+				}
+				// User is found in admins table, set isAdmin to true
+				isAdmin = true
+			}
+
+      if !checkPasswordHash(password, storedPassword) {
+        renderLoginTemplateWithError(w, "Error creating account. Please try again", templates)
         return
-      } else if !checkPasswordHash(password, storedPassword) {
-        renderLoginTemplateWithError(w, "Incorrect password", templates)
       }
       
       // create a new session
@@ -152,7 +173,11 @@ func HandleLogin(store *sessions.CookieStore, templates *template.Template, db *
       session.Values["authenticated"] = true
       session.Values["user"] = email
       session.Values["user_id"] = userId
-      session.Values["is_admin"].isAdmin
+      if isAdmin {
+        session.Values["is_admin"] = true
+      } else {
+        session.Values["is_admin"] = false
+      }
 
       err = session.Save(r, w)
       if err != nil {
@@ -194,22 +219,23 @@ func renderSignupTemplateWithError(w http.ResponseWriter, errorMessage string, t
   }
 }
 
-func hashPassword(password string) (string, error) {
-  hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-  if err != nil {
-    return "", err
-  }
-  return string(hashedPassword), nil
-}
-
-func checkPasswordHash(password, hash string) bool {
-    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-    return err == nil
-}
-
-func handleGetJobs(db *sql.DB, templates *template.Template) http.HandlerFunc {
+func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-      adminID := r.Context().Value("admin_id").(string)
+      userId := r.Context().Value("user_id").(string)
+      isAdmin := r.Context().Value("is_admin").(bool)
+
+      var adminId string
+
+      if isAdmin {
+        adminId = userId
+      } else {
+        err := db.QueryRow(`SELECT admin_id FROM users WHERE id = $1`, userId).Scan(&adminId)
+        if err != nil {
+          http.Error(w, "Error fetching admin id from database", http.StatusInternalServerError)
+          return
+        }
+      }
+
       query := `SELECT id, job_name, company_name, created_at FROM jobs WHERE admin_id = $1`
       rows, err := db.Query(query, adminID)
       if err != nil {
@@ -229,57 +255,20 @@ func handleGetJobs(db *sql.DB, templates *template.Template) http.HandlerFunc {
           jobs = append(jobs, job)
       }
 
-      err = templates.ExecuteTemplate(w, "jobs.html", jobs)
+      jsonJobs, err := json.Marshal(jobs)
+
       if err != nil {
-          http.Error(w, "Template rendering error", http.StatusInternalServerError)
+        http.Error(w, "Failed to serialize jobs", http.StatusInternalServerError)
+        return
       }
+
+      // Set content type and send JSON response
+      w.Header().Set("Content-Type", "application/json")
+      w.WriteHeader(http.StatusOK)
+      w.Write(jsonJobs)
+    }
   }
 }
-
-//func handleGetJobs(w http.ResponseWriter, r *http.Request) {
-//  // need to only select jobs from database that belong to company
-//  session, err := store.Get(r, "SESSION_KEY")
-//  if err != nil {
-//    http.Error(w, err.Error(), http.StatusInternalServerError)
-//    return
-//  }
-//  
-//  companyId, ok := session.Values["company_id"].(string)
-//  if !ok {
-//    http.Error(w, "unauthorized", http.StatusUnauthorized)
-//  }
-//  
-//  query := `SELECT id, job_name, company_name, user_id, company_id, created_at FROM jobs where company_id = $1`
-//
-//  rows, err := db.Query(query, companyId)
-//  if err != nil {
-//    http.Error(w, "Failed to retrieve jobs", http.StatusInternalServerError)
-//    return
-//  }
-//  defer rows.Close()
-//
-//  var jobs []Job
-//
-//  for rows.Next() {
-//    var job Job
-//    if err := rows.Scan(&job.ID, &job.JobName, &job.CompanyName, &job.UserID, &job.CompanyID, &job.CreatedAt); err != nil {
-//      http.Error(w, "Failed to scan for jobs", http.StatusInternalServerError)
-//      return
-//    }
-//    jobs = append(jobs, job)
-//  }
-//
-//  if err := rows.Err(); err != nil {
-//    http.Error(w, "Failed to retrieve jobs", http.StatusInternalServerError)
-//    return
-//  
-//
-//  w.Header().Set("Content-Type", "application/json")
-//  if err := json.NewEncoder(w).Encode(jobs); err != nil {
-//    http.Error(w, "Failed to encode jobs", http.StatusInternalServerError)
-//    return
-//  }
-//}
 
 func HandleGetMapWithJob(templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
@@ -328,54 +317,38 @@ func HandleGetContactPage(templates *template.Template) http.HandlerFunc {
   }
 }
 
-func HandleCreateJob(store *sessions.CookieStore) http.HandlerFunc {
+func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
     jobName := r.FormValue("job-name")
     companyName := r.FormValue("company-name")
+
     session, err := store.Get(r, "SESSION_KEY")
     if err != nil {
       http.Error(w, err.Error(), http.StatusInternalServerError)
       return
     }
 
-    if auth, ok := session.Values["authenticated"].(bool); ok && auth {
-      http.Redirect(w, r, "/map", http.StatusSeeOther)
-      return
-    }
-
+    id, err := insertJobIntoDb(jobName, companyName, adminId, db)
     if err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
+    	http.Error(w, err.Error(), http.StatusInternalServerError)
       return
     }
-
-    _ = jobName
-    _ = companyName
-    var id = 1
-
-    //id, err := insertJobIntoDb(jobName, companyName)
-    //if err != nil {
-    //	http.Error(w, err.Error(), http.StatusInternalServerError)
-    //  return
-    //}
-
-    //fmt.Println(id)
 
     http.Redirect(w, r, fmt.Sprintf("/map/%s", id), http.StatusSeeOther)
   }
 }
 
-//func insertJobIntoDb(jobName, companyName, userId, companyId string, db *sql.Db) (string, error) {
-//  query := `INSERT INTO jobs (id, job_name, company_name, user_id, company_id, created_at)
-//            VALUES (gen_random_uuid(), $1, $2, $3, $4, CURRENT_TIMESTAMP)
-//            RETURNING id
-//           `
-//  var id string
-//  err := db.QueryRow(query, jobName, companyName, userId, companyId).Scan(&id)
-//	//err := db.Exec(query, jobName, companyName).Scan(&id)
-//  if err != nil {
-//    log.Printf("Error inserting job into database: %v", err)
-//    return "", err
-//  }
-//
-//  return id, nil
-//}
+func insertJobIntoDb(jobName, companyName, adminId string, db *sql.Db) (string, error) {
+  query := `INSERT INTO jobs (id, job_name, company_name, admin_id, created_at)
+            VALUES (gen_random_uuid(), $1, $2, $3, CURRENT_TIMESTAMP)
+            RETURNING id
+           `
+  var id string
+  err := db.QueryRow(query, jobName, companyName, adminId).Scan(&id)
+  if err != nil {
+    log.Printf("Error inserting job into database: %v", err)
+    return "", err
+  }
+
+  return id, nil
+}
