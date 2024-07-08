@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/styles.css" type="text/css">
+    <title>Signup</title>
+</head>
+<body>
+    <div id="background">
+        <div id="container">
+            <h2 id="title">Signup</h2>
+            <form id="signup-form" action="http://localhost:8080/signup" method="POST">
+                <div class="inputContainer">
+                    <label for="email" class="label">Email</label>
+                    <input type="email" id="email" class="input" name="email"required />
+                </div>
+                <div class="inputContainer">
+                    <label for="password" class="label">Password</label>
+                    <input type="password" id="password" class="input" name="password" required />
+                </div>
+                <div class="inputContainer">
+                    <label for="confirm_password" class="label">Re-enter Password</label>
+                    <input type="password" id="confirm_password" class="input" name="confirm_password" required />
+                </div>
+                <div class="inputContainer">
+                  <label for="location" class="label">Business address</label>
+                  <input type="text" id="location" class="input" name="location" />
+                </div>
+                <div class="inputContainer">
+                  <label for="company_name" class="label">Company Name</label>
+                  <input type="text" id="company_name" class="input" name="company_name" />
+                </div>
+                {{ if .Error }}
+                <p style="color: red;">{{.Error}}</p>
+                {{ end }}
+                <button type="submit" id="login-button">Register</button>
+            </form>
+            <p class="text-sm text-white text-center">
+                Already have an account? <a href="/login">Sign in</a>
+            </p>
+            <p class="text-sm text-white text-center">Terms of Service and Privacy</p>
+        </div>
+    </div>
+</body>
+</html>
