@@ -1,12 +1,13 @@
 package handlers
 
 import (
+	"database/sql"
   "encoding/json"
+  "html/template"
 	"fmt"
 	"net/http"
-	"database/sql"
-  "html/template"
   "time"
+  "log"
 	"github.com/gorilla/sessions"
 	"golang.org/x/crypto/bcrypt"
   _ "github.com/lib/pq"
@@ -221,52 +222,51 @@ func renderSignupTemplateWithError(w http.ResponseWriter, errorMessage string, t
 
 func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-      userId := r.Context().Value("user_id").(string)
-      isAdmin := r.Context().Value("is_admin").(bool)
+    userId := r.Context().Value("user_id").(string)
+    isAdmin := r.Context().Value("is_admin").(bool)
 
-      var adminId string
+    var adminId string
 
-      if isAdmin {
-        adminId = userId
-      } else {
-        err := db.QueryRow(`SELECT admin_id FROM users WHERE id = $1`, userId).Scan(&adminId)
-        if err != nil {
-          http.Error(w, "Error fetching admin id from database", http.StatusInternalServerError)
-          return
-        }
-      }
-
-      query := `SELECT id, job_name, company_name, created_at FROM jobs WHERE admin_id = $1`
-      rows, err := db.Query(query, adminID)
+    if isAdmin {
+      adminId = userId
+    } else {
+      err := db.QueryRow(`SELECT admin_id FROM users WHERE id = $1`, userId).Scan(&adminId)
       if err != nil {
-          http.Error(w, "Database error", http.StatusInternalServerError)
-          return
-      }
-      defer rows.Close()
-
-      var jobs []Job
-      for rows.Next() {
-          var job Job
-          err := rows.Scan(&job.ID, &job.JobName, &job.CompanyName, &job.CreatedAt)
-          if err != nil {
-              http.Error(w, "Database error", http.StatusInternalServerError)
-              return
-          }
-          jobs = append(jobs, job)
-      }
-
-      jsonJobs, err := json.Marshal(jobs)
-
-      if err != nil {
-        http.Error(w, "Failed to serialize jobs", http.StatusInternalServerError)
+        http.Error(w, "Error fetching admin id from database", http.StatusInternalServerError)
         return
       }
-
-      // Set content type and send JSON response
-      w.Header().Set("Content-Type", "application/json")
-      w.WriteHeader(http.StatusOK)
-      w.Write(jsonJobs)
     }
+
+    query := `SELECT id, job_name, company_name, created_at FROM jobs WHERE admin_id = $1`
+    rows, err := db.Query(query, adminId)
+    if err != nil {
+      http.Error(w, "Database error", http.StatusInternalServerError)
+      return
+    }
+    defer rows.Close()
+
+    var jobs []Job
+    for rows.Next() {
+      var job Job
+      err := rows.Scan(&job.ID, &job.JobName, &job.CompanyName, &job.CreatedAt)
+      if err != nil {
+        http.Error(w, "Database error", http.StatusInternalServerError)
+        return
+      }
+      jobs = append(jobs, job)
+    }
+
+    jsonJobs, err := json.Marshal(jobs)
+
+    if err != nil {
+      http.Error(w, "Failed to serialize jobs", http.StatusInternalServerError)
+      return
+    }
+
+    // Set content type and send JSON response
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    w.Write(jsonJobs)
   }
 }
 
@@ -322,10 +322,19 @@ func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
     jobName := r.FormValue("job-name")
     companyName := r.FormValue("company-name")
 
-    session, err := store.Get(r, "SESSION_KEY")
-    if err != nil {
-      http.Error(w, err.Error(), http.StatusInternalServerError)
-      return
+    userId := r.Context().Value("user_id").(string)
+    isAdmin := r.Context().Value("is_admin").(bool)
+
+    var adminId string
+
+    if isAdmin {
+      adminId = userId
+    } else {
+      err := db.QueryRow(`SELECT admin_id FROM users WHERE id = $1`, userId).Scan(&adminId)
+      if err != nil {
+        http.Error(w, "Error fetching admin id from database", http.StatusInternalServerError)
+        return
+      }
     }
 
     id, err := insertJobIntoDb(jobName, companyName, adminId, db)
@@ -338,7 +347,7 @@ func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
   }
 }
 
-func insertJobIntoDb(jobName, companyName, adminId string, db *sql.Db) (string, error) {
+func insertJobIntoDb(jobName, companyName, adminId string, db *sql.DB) (string, error) {
   query := `INSERT INTO jobs (id, job_name, company_name, admin_id, created_at)
             VALUES (gen_random_uuid(), $1, $2, $3, CURRENT_TIMESTAMP)
             RETURNING id
