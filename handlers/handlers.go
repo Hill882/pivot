@@ -88,8 +88,8 @@ func HandleSignup(store *sessions.CookieStore, templates *template.Template, db 
 
       //set session values
       session.Values["authenticated"] = true
-      session.Values["user"] = email
-      session.Values["id"] = id 
+      session.Values["user_email"] = email
+      session.Values["user_id"] = id 
       session.Values["admin"] = true
 
       err = session.Save(r, w)
@@ -170,14 +170,15 @@ func HandleLogin(store *sessions.CookieStore, templates *template.Template, db *
         return
       }
 
+      // check cookies match
       //set session values
       session.Values["authenticated"] = true
-      session.Values["user"] = email
+      session.Values["user_email"] = email
       session.Values["user_id"] = userId
       if isAdmin {
-        session.Values["is_admin"] = true
+        session.Values["admin"] = true
       } else {
-        session.Values["is_admin"] = false
+        session.Values["admin"] = false
       }
 
       err = session.Save(r, w)
@@ -223,9 +224,18 @@ func renderSignupTemplateWithError(w http.ResponseWriter, errorMessage string, t
 func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
     userId := r.Context().Value("user_id").(string)
+    //if !ok || userId == "" {
+    //  http.Error(w, "User ID not found in context", http.StatusUnauthorized)
+    //  return
+    //}
     isAdmin := r.Context().Value("is_admin").(bool)
+    //if !ok {
+    //  http.Error(w, "Admin status not found in context", http.StatusUnauthorized)
+    //  return
+    //}
 
     var adminId string
+
 
     if isAdmin {
       adminId = userId
