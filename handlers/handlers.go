@@ -236,7 +236,7 @@ func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.
         return
     }
 
-    isAdmin, ok := session.Values["is_admin"].(bool)
+    isAdmin, ok := session.Values["admin"].(bool)
     if !ok {
         http.Error(w, "Admin status not found in context", http.StatusUnauthorized)
         return
@@ -364,7 +364,7 @@ func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
         return
     }
 
-    isAdmin, ok := session.Values["is_admin"].(bool)
+    isAdmin, ok := session.Values["admin"].(bool)
     if !ok {
         http.Error(w, "Admin status not found in context", http.StatusUnauthorized)
         return
@@ -411,7 +411,8 @@ func insertJobIntoDb(jobName, companyName, adminId string, db *sql.DB) (string, 
   return id, nil
 }
 
-func handleUploadLas(store *sessions.CookieStore, db *sql.DB) http.HandleFunc {
+func HandleUploadLas(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
+    http.Redirect(w, r, fmt.Sprintf("/map"), http.StatusSeeOther)
   }
 }
