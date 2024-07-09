@@ -1,6 +1,5 @@
 <!-- NAVBAR -->
 <style>
-
   #settings-modal a li {
     text-decoration: none;
     color: black;
@@ -28,25 +27,57 @@
     z-index: 3000;
     background-color: white;
   }
+
+  .hidden {
+    display: none;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  .btn.btn-primary {
+    background-color: #007bff; /* Blue color */
+    border-color: #007bff; /* Blue border */
+    color: #fff; /* White text */
+  }
+
+  .btn.btn-primary:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+    border-color: #0056b3; /* Darker blue border on hover */
+  }
+
+  .button-spacing {
+    margin-left: 10px; /* Adjust spacing as needed */
+  }
 </style>
 
 <div id="nav-bar">
   <div id="left-container">
-    <img src="/static/images/logo.webp" id="logo"  alt="logo"/>
+    <img src="/static/images/logo.webp" id="logo" alt="logo"/>
     <span id="logo-name">Pivot</span>
 
     <div class="search-container" id="job-search-container">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input class="search" id="job-search-input" placeholder="Search Jobs" autocomplete="off" />
+      <input class="search" id="job-search-input" placeholder="Search Jobs" autocomplete="off"/>
       <i id="joblist-dropdown" class="fa-solid fa-caret-down"></i>
     </div>
 
-    <button id="create-job-button" type="button" class="btn btn-primary">create job</button>
+    <button id="create-job-button" type="button" class="btn btn-primary">Create Job</button>
+    <button id="upload-button" type="button" class="btn btn-primary button-spacing">Upload</button>
+    <input type="file" id="file-input" class="visually-hidden" />
   </div>
   <div id="middle-container">
     <div class="search-container">
       <i class="fa-solid fa-magnifying-glass"></i>
-      <input class="search" id="google-maps-search" placeholder="Search location..." />
+      <input class="search" id="google-maps-search" placeholder="Search location..."/>
     </div>
     {{ if .ShowTools }}
       <i class="fa-solid fa-upload"></i>
@@ -70,7 +101,7 @@
         <button type="button" class="btn-close" aria-label="Close" id="close-modal"></button>
       </div>
       <div class="modal-body">
-        <form action="http://localhost:8080/createJob" method="POST" id="create-job-form" >
+        <form action="http://localhost:8080/createJob" method="POST" id="create-job-form">
           <div class="mb-3">
             <label for="job-name" class="form-label">Job Name:</label>
             <input type="text" class="form-control" id="job-name" name="job-name" placeholder="Enter Job Name" required>
@@ -91,13 +122,9 @@
 
 <!-- END OF JOB MODAL -->
 
-
 <!-- JOBLIST DROPDOWN MENU -->
-
 <ul id="dropdown-menu" class="hidden"></ul>
-
 <!-- END OF JOBLIST DROPDOWN MENU -->
-
 
 <!-- SETTINGS -->
 <ul id="settings-modal">
@@ -106,6 +133,7 @@
 
 <script>
   $(document).ready(function() {
+    // Toggle settings modal display
     $(".avatar").on("click", function() {
       let settingsModal = $("#settings-modal");
       if (settingsModal.css("display") === "none") {
@@ -113,7 +141,36 @@
       } else {
           settingsModal.css("display", "none");
       }
-    })
-  })
+    });
+
+    // Trigger the hidden file input when the Upload button is clicked
+    $('#upload-button').on('click', function() {
+      $('#file-input').click();
+    });
+
+    // Handle file selection and submit to endpoint
+    $('#file-input').on('change', async function() {
+      const file = this.files[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/uploadLas', {
+          method: 'POST',
+          data: formData,
+        })
+        setTimeout(() => {
+          
+        }, 10000)
+        if (!response) {
+          console.error("Error uploading las file to server");
+        }
+
+        const data = response.json()
+        
+        console.log(data)
+      }
+    });
+  });
 </script>
 <!-- END OF SETTINGS -->
