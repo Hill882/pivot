@@ -223,19 +223,26 @@ func renderSignupTemplateWithError(w http.ResponseWriter, errorMessage string, t
 
 func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-    userId := r.Context().Value("user_id").(string)
-    //if !ok || userId == "" {
-    //  http.Error(w, "User ID not found in context", http.StatusUnauthorized)
-    //  return
-    //}
-    isAdmin := r.Context().Value("is_admin").(bool)
-    //if !ok {
-    //  http.Error(w, "Admin status not found in context", http.StatusUnauthorized)
-    //  return
-    //}
+    // Check if user session exists
+    session, err := store.Get(r, "SESSION_KEY")
+    if err != nil {
+      http.Error(w, err.Error(), http.StatusInternalServerError)
+      return
+    }
+
+    userId, ok := session.Values["user_id"].(string)
+    if !ok {
+        http.Error(w, "User ID not found in context", http.StatusUnauthorized)
+        return
+    }
+
+    isAdmin, ok := session.Values["is_admin"].(bool)
+    if !ok {
+        http.Error(w, "Admin status not found in context", http.StatusUnauthorized)
+        return
+    }
 
     var adminId string
-
 
     if isAdmin {
       adminId = userId
@@ -266,17 +273,22 @@ func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.
       jobs = append(jobs, job)
     }
 
-    jsonJobs, err := json.Marshal(jobs)
-
-    if err != nil {
-      http.Error(w, "Failed to serialize jobs", http.StatusInternalServerError)
-      return
+    if len(jobs) == 0 {
+      jobs = []Job{} // Ensure jobs is explicitly set to an empty array
     }
+    json.NewEncoder(w).Encode(jobs)
+
+    //jsonJobs, err := json.Marshal(jobs)
+    //fmt.Println(jsonJobs)
+    //if err != nil {
+    //  http.Error(w, "Failed to serialize jobs", http.StatusInternalServerError)
+    //  return
+    //}
 
     // Set content type and send JSON response
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(jsonJobs)
+    //w.Header().Set("Content-Type", "application/json")
+    //w.WriteHeader(http.StatusOK)
+    //json.NewEncoder(w).Encode(jobs)
   }
 }
 
@@ -329,11 +341,26 @@ func HandleGetContactPage(templates *template.Template) http.HandlerFunc {
 
 func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
+    session, err := store.Get(r, "SESSION_KEY")
+    if err != nil {
+      http.Error(w, err.Error(), http.StatusInternalServerError)
+      return
+    }
+
+    userId, ok := session.Values["user_id"].(string)
+    if !ok {
+        http.Error(w, "User ID not found in context", http.StatusUnauthorized)
+        return
+    }
+
+    isAdmin, ok := session.Values["is_admin"].(bool)
+    if !ok {
+        http.Error(w, "Admin status not found in context", http.StatusUnauthorized)
+        return
+    }
+
     jobName := r.FormValue("job-name")
     companyName := r.FormValue("company-name")
-
-    userId := r.Context().Value("user_id").(string)
-    isAdmin := r.Context().Value("is_admin").(bool)
 
     var adminId string
 
@@ -352,7 +379,8 @@ func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
     	http.Error(w, err.Error(), http.StatusInternalServerError)
       return
     }
-
+    fmt.Println(id)
+    
     http.Redirect(w, r, fmt.Sprintf("/map/%s", id), http.StatusSeeOther)
   }
 }

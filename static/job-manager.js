@@ -27,22 +27,18 @@ export class JobManager {
     createJobButton.on('click', this.openModal.bind(this));
     closeModalButton.on('click', this.closeModal.bind(this));
     closeModalHeader.on('click', this.closeModal.bind(this));
-
   }
 
   async fetchJobs() {
     try {
       const response = await fetch("/jobs");
+      console.log(response)
       if (!response.ok) {
         throw new Error(`Http error! status: ${response.status}`);
       }
-
       const jobs = await response.json();
-      console.log(jobs)
-      if (jobs.length !== 0) {
-        this.jobList = jobs;
-        this.populateDropdown(this.jobList);
-      }
+      this.jobList = jobs; // Assign jobs directly
+      this.populateDropdown(this.jobList);
     } catch (error) {
       console.error("Failed to fetch jobs", error);
     }
@@ -97,7 +93,7 @@ export class JobManager {
       jobListContainer.append(listItem);
     } else {
       items.forEach((item, index) => {
-        const listItem = $(`<a href="/map/${item.id}"><li>${item.name}</li></a>`);
+        const listItem = $(`<a href="/map/${item.id}"><li>${item.job_name}</li></a>`);
 
         if (index === items.length - 1) {
           listItem.find('li').css('border-bottom', 'none');
