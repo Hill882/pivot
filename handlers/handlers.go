@@ -294,7 +294,13 @@ func HandleGetJobs(store *sessions.CookieStore, db *sql.DB, templates *template.
 
 func HandleGetMapWithJob(templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-    err := templates.ExecuteTemplate(w, "index.html", nil)
+    data := struct {
+      ShowTools bool
+
+    }{
+      ShowTools: true,
+    }
+    err := templates.ExecuteTemplate(w, "index.html", data)
     if err != nil {
       http.Error(w, err.Error(), http.StatusInternalServerError)
       return
@@ -304,7 +310,12 @@ func HandleGetMapWithJob(templates *template.Template) http.HandlerFunc {
 
 func HandleGetMap(templates *template.Template) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-    err := templates.ExecuteTemplate(w, "index.html", nil)
+    data := struct {
+      ShowTools bool
+    }{
+      ShowTools: false,
+    }
+    err := templates.ExecuteTemplate(w, "index.html", data)
     if err != nil {
       http.Error(w, err.Error(), http.StatusInternalServerError)
       return
@@ -398,4 +409,9 @@ func insertJobIntoDb(jobName, companyName, adminId string, db *sql.DB) (string, 
   }
 
   return id, nil
+}
+
+func handleUploadLas(store *sessions.CookieStore, db *sql.DB) http.HandleFunc {
+  return func(w http.ResponseWriter, r *http.Request) {
+  }
 }
