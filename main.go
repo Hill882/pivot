@@ -82,7 +82,7 @@ func main() {
   r.Handle("/map/{id}", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleGetMapWithJob(templates)))).Methods("GET")
   r.Handle("/createJob", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleCreateJob(store, db)))).Methods("POST")
   r.Handle("/jobs", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleGetJobs(store, db, templates)))).Methods("GET")
-  r.Handle("/uploadLas", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleUploadLas(store, db)))).Methods("POST")
+  r.Handle("/uploadLas/{id}", authenticationMiddleware(store, http.HandlerFunc(handlers.HandleUploadLas(store, db)))).Methods("POST")
 
 
   log.Println("Server started at http://localhost:8080/map")

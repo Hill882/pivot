@@ -1,0 +1,7 @@
+database:
+
+sudo -i -u postgres
+psql pivot
+
+TODO:
+  need to create database tables for test database

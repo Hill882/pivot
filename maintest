@@ -1,0 +1,36 @@
+
+// THIS BELONGS TO THE MAIN TEST SUITE
+//package main
+//
+//import (
+//	"net/http"
+//	"net/http/httptest"
+//	"testing"
+//)
+//
+//func TestHomePageHandler(t *testing.T) {
+//	req, err := http.NewRequest("GET", "/", nil)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	// Create a response recorder to record the response
+//	rr := httptest.NewRecorder()
+//
+//	// Create a handler for the home page
+//	handler := http.HandlerFunc(handleGetHomePage)
+//
+//	// Serve the request
+//	handler.ServeHTTP(rr, req)
+//
+//	// Check the status code of the response
+//	if rr.Code != http.StatusOK {
+//		t.Errorf("Expected status code %d, got %d", http.StatusOK, rr.Code)
+//	}
+//
+//	// Check the content type header
+//	expectedContentType := "text/html; charset=utf-8"
+//	if ct := rr.Header().Get("Content-Type"); ct != expectedContentType {
+//		t.Errorf("Expected content type %s, got %s", expectedContentType, ct)
+//	}
+//}

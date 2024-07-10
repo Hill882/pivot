@@ -4,12 +4,16 @@ import (
 	"database/sql"
   "encoding/json"
   "html/template"
-  "io/ioutil"
+  "path/filepath"
 	"fmt"
+  "io"
 	"net/http"
+  "strings"
   "time"
   "log"
+  "os"
 	"github.com/gorilla/sessions"
+  "github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
   _ "github.com/lib/pq"
 )
@@ -391,7 +395,6 @@ func HandleCreateJob(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
     	http.Error(w, err.Error(), http.StatusInternalServerError)
       return
     }
-    fmt.Println(id)
     
     http.Redirect(w, r, fmt.Sprintf("/map/%s", id), http.StatusSeeOther)
   }
@@ -414,32 +417,72 @@ func insertJobIntoDb(jobName, companyName, adminId string, db *sql.DB) (string, 
 
 func HandleUploadLas(store *sessions.CookieStore, db *sql.DB) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-    func ReceiveFile(w http.ResponseWriter, r *http.Request) {
-    r.ParseMultipartForm(32 << 20) // limit your max input length!
-    var buf bytes.Buffer
-    // in your case file would be fileupload
+    vars := mux.Vars(r)
+    jobId := vars["id"]
+
+    var adminId string
+    query := `SELECT admin_id FROM jobs WHERE id = $1`
+    err := db.QueryRow(query, jobId).Scan(&adminId)
+    if err != nil {
+      http.Error(w, "Error getting admin id from jobs", http.StatusInternalServerError)
+      return
+    }
+
+    // Ensure Content-Type is multipart/form-data
+    if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+      http.Error(w, "Content-Type must be multipart/form-data", http.StatusBadRequest)
+      return
+    }
+
+    // Parse the multipart form with a max memory of 32 MB
+    if err := r.ParseMultipartForm(32 << 20); err != nil {
+      http.Error(w, "Unable to parse form", http.StatusBadRequest)
+      return
+    }
+
+    // Retrieve the file from the form input
     file, header, err := r.FormFile("file")
     if err != nil {
-        panic(err)
+      http.Error(w, "Unable to get file", http.StatusBadRequest)
+      return
     }
     defer file.Close()
-    name := strings.Split(header.Filename, ".")
-    fmt.Printf("File name %s\n", name[0])
-    // Copy the file data to my buffer
-    io.Copy(&buf, file)
-    // do something with the contents...
-    // I normally have a struct defined and unmarshal into a struct, but this will
-    // work as an example
-    contents := buf.String()
-    fmt.Println(contents)
-    // I reset the buffer in case I want to use it again
-    // reduces memory allocations in more intense projects
-    buf.Reset()
-    // do something else
-    // etc write header
-    return
+
+    // Check if the file has a .las extension
+    name := strings.ToLower(header.Filename)
+    if !strings.HasSuffix(name, ".las") {
+      http.Error(w, "File is not a LAS file", http.StatusBadRequest)
+      return
+    }
+
+    serverDir := os.Getenv("SERVER_DIR")
+
+    folderPath := filepath.Join(serverDir, adminId)
+
+    if err := os.MkdirAll(folderPath, os.ModePerm); err != nil {
+      http.Error(w, "Error creating uploads folder", http.StatusInternalServerError)
+      return
+    }
+
+    filePath := filepath.Join(folderPath, fmt.Sprintf("%s.las", jobId))
+
+    outFile, err := os.Create(filePath)
+    if err != nil {
+      http.Error(w, "Unable to create file on server", http.StatusInternalServerError)
+      return
+    }
+  
+    defer outFile.Close()
+
+    if _, err := io.Copy(outFile, file); err != nil {
+      http.Error(w, "Error saving file", http.StatusInternalServerError)
+      return
+    }
+    
+    w.Write([]byte("LAS file uploaded and processed successfully"))
   }
 }
+
 
 func isLasFile(data []byte) bool {
   const lasHeader = ".lasf"
