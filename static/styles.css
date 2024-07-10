@@ -664,10 +664,9 @@ select {
 #create-job-button {
   cursor: pointer;
   margin-left: 10px;
-  color: black;
-  padding: 7px;
-  border-radius: 5px;
   color: white;
+  border-radius: 4px;
+  padding: 5px;
 }
 
 
@@ -763,12 +762,10 @@ select {
 }
 
 #upload-button {
-  padding: 10px 20px;
-  font-size: 16px;
-  color: white;
-  background-color: blue;
-  border: none;
   cursor: pointer;
+  color: black;
+  font-size: 24px;
+  margin-left: 20px;
 }
 
 /* Spinner styles */
